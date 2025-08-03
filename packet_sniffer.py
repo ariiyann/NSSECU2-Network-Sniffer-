@@ -84,8 +84,8 @@ def process_packet(packet):
         
         if packet.haslayer(scapy.Raw):
             load = packet[scapy.Raw].load.decode(errors='ignore')
-            user_fields = re.findall(r"(username|user|email)=([^&\s]+)", load, re.I)
-            pass_fields = re.findall(r"(password|pass|pwd)=([^&\s]+)", load, re.I)
+            user_fields = re.findall(r"(username|user|email|login|uid|id)=([^&\s]+)", load, re.I)
+            pass_fields = re.findall(r"(password|pass|pwd|passw|secret)=([^&\s]+)", load, re.I)
             if user_fields or pass_fields:
                 creds = create_creds('HTTP', packet, timestamp, user_fields, pass_fields)
                 log_credential(creds)
@@ -122,9 +122,24 @@ def main():
     
     # BASED ON SPECS: The tool must capture live network packets on a specified network interface within a controlled lab environment.
     try:
-        scapy.sniff(iface=iface, store=False, prn=process_packet, timeout=duration or None, count=count or None)
+        # To avoid socket errors
+        sniff_params = {
+            'iface': iface,
+            'store': False,
+            'prn': process_packet
+        }
+        
+        if duration > 0:
+            sniff_params['timeout'] = duration
+        if count > 0:
+            sniff_params['count'] = count
+            
+        scapy.sniff(**sniff_params)
+        
     except PermissionError:
         print("[!] Permission denied. Run as root/administrator.")
+    except KeyboardInterrupt:
+        print("\n[!] Sniffing stopped by user.")
     except Exception as e:
         print(f"[!] Error: {e}")
 
@@ -139,4 +154,4 @@ def main():
         print("[SUMMARY] No credentials detected.")
 
 if __name__ == "__main__":
-    main()
+    main() 

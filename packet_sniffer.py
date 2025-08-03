@@ -108,6 +108,19 @@ def process_packet(packet):
                     creds = create_creds('FTP', packet, timestamp, user_fields, pass_fields)
                     log_credential(creds)
                     print(f"[FTP] Credentials Detected: {creds}")
+            
+            # FTP File Transfer Commands
+            ftp_commands = [
+                "STOR", "RETR", "PUT", "GET", "LIST", "LS", "PWD", "CWD", "CDUP",
+                "MKD", "RMD", "DELE", "RNFR", "RNTO", "SIZE", "MDTM"
+            ]
+            
+            for cmd in ftp_commands:
+                if cmd in load:
+                    operation_info = f"[FTP_OP] {timestamp} | {packet[scapy.IP].src} -> {packet[scapy.IP].dst} | Command: {load.strip()}"
+                    print(f"[+] FTP Operation detected: {operation_info}")
+                    log_ftp_operation(operation_info)
+                    break
 
 def main():
     """
@@ -155,3 +168,4 @@ def main():
 
 if __name__ == "__main__":
     main() 
+

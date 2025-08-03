@@ -119,7 +119,6 @@ def process_packet(packet):
                 if cmd in load:
                     operation_info = f"[FTP_OP] {timestamp} | {packet[scapy.IP].src} -> {packet[scapy.IP].dst} | Command: {load.strip()}"
                     print(f"[+] FTP Operation detected: {operation_info}")
-                    log_ftp_operation(operation_info)
                     break
 
 def main():
@@ -168,4 +167,5 @@ def main():
 
 if __name__ == "__main__":
     main() 
+
 
